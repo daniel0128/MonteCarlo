@@ -93,15 +93,11 @@ class MonteCarlo:
 
     def surface_area(self,N):
         atoms_data = self.data
-
+        #todo: surface area:
         for i in xrange(N):
             phi = random.uniform(0,2*math.pi)
             costheta = random.uniform(-1,1)
             theta = math.acos(costheta)
-
-
-
-
 
 
 if __name__ == '__main__':
