@@ -26,12 +26,36 @@ class NpFileIO(FileIO):
         return data
 
 
+class ProcePDB:
+    radii = {'N': 1.625,'CA': 1.9,'C': 1.875,'O': 1.48,'CB': 1.952,'CG': 1.952,'CG1': 1.952,'CG2': 1.955,
+             'CD': 1.952,'CD1': 1.952,'CD2': 1.875,'CE': 1.952,'CE1': 1.875,'CE2': 1.875,'CE3': 1.875,
+             'CZ': 1.875,'CZ2': 1.875,'CZ3': 1.875,'CH2': 1.875,'SG': 1.775,'SD': 1.775,'OG': 1.535,'OG1': 1.535,
+             'OD1': 1.48,'OD2': 1.48,'OE1': 1.48,'OE2': 1.48,'ND1': 1.625,'ND2': 1.625,'NE': 1.625,'NE1': 1.625,
+             'NE2': 1.625,'NZ': 1.625,'NH1': 1.625,'NH2': 1.625,'OH': 1.535
+             }
+    def __init__(self,fileName):
+        pdbl = PDBList()
+        #todo: what's this?
+        pdbl.retrieve_pdb_file('1EN2') # arg is the pdb id
+
+        parser = PDBParser()# will auto-correct obvious errors in pdb file
+        #todo: filename not hard code
+        self.structure = parser.get_structure('test','test.pdb')
+        atom_list = []
+        [atom_list.append(np.append(atom.get_coord(),self.radii[ atom.get_name()]).tolist()) for atom in self.structure.get_atoms()]
+        self.atoms = np.asarray(atom_list)
+
+    def get_atoms(self):
+        return self.atoms
+
+
 class MonteCarlo:
     def __init__(self, data):
         self.data = data
 
     def volume(self, N):
         atoms_data = self.data
+
         x_max = np.max(atoms_data[:, 0] + atoms_data[:, 3])
         x_min = np.min(atoms_data[:, 0] - atoms_data[:, 3])
         length = x_max - x_min
@@ -67,30 +91,15 @@ class MonteCarlo:
         # print v
         return [v, sd]
 
+    def surface_area(self,N):
+        atoms_data = self.data
 
-class ProcePDB:
-    radii = {'N': 1.625,'CA': 1.9,'C': 1.875,'O': 1.48,'CB': 1.952,'CG': 1.952,'CG1': 1.952,'CG2': 1.955,
-             'CD': 1.952,'CD1': 1.952,'CD2': 1.875,'CE': 1.952,'CE1': 1.875,'CE2': 1.875,'CE3': 1.875,
-             'CZ': 1.875,'CZ2': 1.875,'CZ3': 1.875,'CH2': 1.875,'SG': 1.775,'SD': 1.775,'OG': 1.535,'OG1': 1.535,
-             'OD1': 1.48,'OD2': 1.48,'OE1': 1.48,'OE2': 1.48,'ND1': 1.625,'ND2': 1.625,'NE': 1.625,'NE1': 1.625,
-             'NE2': 1.625,'NZ': 1.625,'NH1': 1.625,'NH2': 1.625,'OH': 1.535
-             }
-    def __init__(self,fileName):
-        pdbl = PDBList()
-        pdbl.retrieve_pdb_file('1EN2') # arg is the pdb id
+        for i in xrange(N):
+            phi = random.uniform(0,2*math.pi)
+            costheta = random.uniform(-1,1)
+            theta = math.acos(costheta)
 
-        parser = PDBParser()# will auto-correct obvious errors in pdb file
-        self.structure = parser.get_structure('test','test.pdb')
-        for model in self.structure:
-            for chain in model:
-                for residue in chain:
-                    for atom in residue:
-                        print atom.get_coord(), atom.get_name()  # type of coord is numpy.ndarray of float32
-                                # name of atom is used to get atomic radius from force field and other files
 
-        print
-        print
-        print  "************************************************"
 
 
 
@@ -105,12 +114,16 @@ if __name__ == '__main__':
         atoms_data = fileStream.readFile()
         #
         monteCarlo = MonteCarlo(atoms_data)
+        #
+        # result = map(monteCarlo.volume,[100,1000,10000])
+        # print result
 
+        pdbFile = ProcePDB(inFile)
+        atoms = pdbFile.get_atoms()
+
+        monteCarlo = MonteCarlo(atoms)
         result = map(monteCarlo.volume,[100,1000,10000])
-
         print result
-        # pdbFile = ProcePDB()
-
 
     else:
         print 'command not correct!'
