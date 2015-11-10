@@ -3,6 +3,7 @@ import numpy as np
 import random
 import math
 from Bio.PDB import *
+import time
 
 
 class FileIO:
@@ -33,14 +34,10 @@ class ProcePDB:
              'OD1': 1.48,'OD2': 1.48,'OE1': 1.48,'OE2': 1.48,'ND1': 1.625,'ND2': 1.625,'NE': 1.625,'NE1': 1.625,
              'NE2': 1.625,'NZ': 1.625,'NH1': 1.625,'NH2': 1.625,'OH': 1.535
              }
-    def __init__(self,fileName):
-        pdbl = PDBList()
-        #todo: what's this?
-        pdbl.retrieve_pdb_file('1EN2') # arg is the pdb id
 
+    def __init__(self,fileName):
         parser = PDBParser()# will auto-correct obvious errors in pdb file
-        #todo: filename not hard code
-        self.structure = parser.get_structure('test','test.pdb')
+        self.structure = parser.get_structure('test',fileName)
         atom_list = []
         [atom_list.append(np.append(atom.get_coord(),self.radii[ atom.get_name()]).tolist()) for atom in self.structure.get_atoms()]
         self.atoms = np.asarray(atom_list)
@@ -67,11 +64,11 @@ class MonteCarlo:
         # print y_min,y_max
 
         z_max = np.max(atoms_data[:, 2] + atoms_data[:, 3])
-        z_min = np.min(atoms_data[:, 2] + atoms_data[:, 3])
+        z_min = np.min(atoms_data[:, 2] - atoms_data[:, 3])
         height = z_max - z_min
         # print z_min, z_max
         c = 0
-        for i in range(N):
+        for i in xrange(N):
             random_x = random.uniform(x_min, x_max)
             random_y = random.uniform(y_min, y_max)
             random_z = random.uniform(z_min, z_max)
@@ -80,24 +77,57 @@ class MonteCarlo:
             # print 'dis: ',dis
             d = dis - atoms_data[:, 3] ** 2
             # print 'd: ',d
-            if len([x for x in d if x < 0]) > 0:
+            if min(d)<=0:
                 c += 1
-        # print c
-        # print length*width*height
+            # if len([x for x in d if x < 0]) > 0:
+            #     c += 1
+
         c = float(c)
         N = float(N)
+        # print c
+        #
+        # print length*width*height
+        # print c/N
         v = c / N * length * width * height
         sd = length * width * height * math.sqrt((c / N - (c / N) ** 2) / N)
         # print v
-        return [v, sd]
+        return [int(N), round(v,3), round(sd,3)]
 
-    def surface_area(self,N):
+    def surfatial_area(self,N):
         atoms_data = self.data
-        #todo: surface area:
-        for i in xrange(N):
-            phi = random.uniform(0,2*math.pi)
-            costheta = random.uniform(-1,1)
-            theta = math.acos(costheta)
+        surfatial_area = 0
+        total_area = 0
+
+        for i in xrange(len(atoms_data)):
+            x0 = float(atoms_data[i][0])
+            y0 = float(atoms_data[i][1])
+            z0 = float(atoms_data[i][2])
+            r  = float(atoms_data[i][3])
+            c = 0
+            for j in xrange(N):
+                phi = random.uniform(0,360)
+                costheta = random.uniform(-1,1)
+
+                theta = math.acos(costheta)
+
+                xp = x0 + r*math.sin(theta)*math.cos(phi)
+                yp = y0 + r*math.sin(theta)*math.sin(phi)
+                zp = z0 + r*costheta
+                available = 1
+
+                dis = (xp - atoms_data[:, 0]) ** 2 + (yp - atoms_data[:, 1]) ** 2 + (zp - atoms_data[:,2]) ** 2
+                d = dis - atoms_data[:, 3] ** 2
+                # d = np.delete(d,i,0)
+
+                if min(d) < -0.000000001:
+                    available = 0
+
+                c += available
+
+            surfatial_area += 4 * math.pi * r**2 * float(c)/float(N)
+            total_area += 4 * math.pi * r**2
+
+        return [int(N),round(surfatial_area,3)]
 
 
 if __name__ == '__main__':
@@ -105,21 +135,45 @@ if __name__ == '__main__':
         inFile = sys.argv[1]
         outFile = 'result_' + inFile
 
-        fileStream = NpFileIO(inFile, outFile)
-
-        atoms_data = fileStream.readFile()
-        #
-        monteCarlo = MonteCarlo(atoms_data)
-        #
-        # result = map(monteCarlo.volume,[100,1000,10000])
-        # print result
-
         pdbFile = ProcePDB(inFile)
         atoms = pdbFile.get_atoms()
 
         monteCarlo = MonteCarlo(atoms)
-        result = map(monteCarlo.volume,[100,1000,10000])
-        print result
 
+        t= time.time()
+        volume = map(monteCarlo.volume,[10,100,1000,10000,100000])
+        t=time.time()-t
+        print 'results of volume:'
+        print 'N'.rjust(7),
+        for i in xrange(len(volume)):
+            print str( volume[i][0]).rjust(12),
+        print
+        print 'volume'.rjust(7),
+        for i in xrange(len(volume)):
+            print str( volume[i][1]).rjust(12),
+        print
+        print 'SD'.rjust(7),
+        for i in xrange(len(volume)):
+            print str( volume[i][2]).rjust(12),
+        print
+
+        # print t
+        print '========================================'
+        t = time.time()
+        surfatial = map(monteCarlo.surfatial_area,[5,10,20,50,100])
+        t = time.time()-t
+        print 'results of surfatial area: '
+        print 'N'.rjust(9),
+        for i in xrange(len(surfatial)):
+            print str( surfatial[i][0]).rjust(12),
+        print
+        print 'srf_area'.rjust(9),
+        for i in xrange(len(surfatial)):
+            print str( surfatial[i][1]).rjust(12),
+        print
+
+        # print t
     else:
         print 'command not correct!'
+        print 'python MonteCarlo.py <file_name>'
+        print 'file_name needs end with .pdb'
